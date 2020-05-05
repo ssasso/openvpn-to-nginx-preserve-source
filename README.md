@@ -25,3 +25,69 @@ However, when proxying to the final WebServer destination, the connection will h
 
 ## solution
 OpenVPN can write the proxy connection information on a specific directory (See `[dir]` in the previous paragraph). Thus, we can read this from a local NGINX instance, that will act as a reverse proxy towards our application, and write the `X-Forwarded-For` header accordingly.
+
+### openvpn configuration (part)
+```
+port-share 127.0.0.1 8443 /dev/shm/openvpn-port-share/
+```
+
+### nginx configuration
+First of all, NGINX must be able to read the OpenVPN temp directory content. On the main config file:
+```
+user nginx root;
+```
+Then, our virtual host (example) can be:
+```
+server {
+    listen 8443 ssl http2 default_server;
+    listen [::]:8443 ssl http2 default_server;
+
+    ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
+    ssl_dhparam /etc/ssl/certs/dhparam.pem;
+
+    # Everything is a 404
+    location / {
+            header_filter_by_lua_file /etc/nginx/header_filter.lua;
+            return 404;
+    }
+    # You may need this to prevent return 404 recursion.
+    location = /404.html {
+            internal;
+    }
+}
+```
+Of course from here you can proxy to the final destination.
+
+### lua script
+```lua
+function readAll(file)
+  local f = assert(io.open(file, "rb"))
+  local content = f:read("*all")
+  f:close()
+  return content
+end
+
+local function isempty(s)
+  return s == nil or s == ''
+end
+
+ngx.log(ngx.STDERR, 'Connection params: REMOTE_ADDR=' .. ngx.var.remote_addr .. ' REMOTE_PORT=' .. ngx.var.remote_port)
+
+local fname = '/dev/shm/openvpn-port-share/[AF_INET]' .. ngx.var.remote_addr .. ':' .. ngx.var.remote_port
+
+ngx.log(ngx.STDERR, 'Reading file: ' .. fname)
+
+local fcont = readAll(fname)
+fcont = fcont:gsub("%[AF_INET%]", "")
+
+ngx.log(ngx.STDERR, 'Real user: ' ..fcont)
+
+local hostip = fcont:sub(1, fcont:find(':')-1)
+
+ngx.log(ngx.STDERR, 'Real Source IP: ' ..hostip)
+
+if not isempty(hostip) then
+  ngx.req.set_header("X-Forwarded-For", hostip)
+end
+```
