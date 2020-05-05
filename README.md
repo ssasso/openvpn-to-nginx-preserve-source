@@ -20,7 +20,7 @@ Each generated file will be automatically deleted when the proxied connection is
 
 However, when proxying to the final WebServer destination, the connection will have the OpenVPN host IP as source address (127.0.0.1 if the webserver runs on the same host):
 ```
-127.0.0.1:49268 - - [05/May/2020:11:59:01 +0000] "GET / HTTP/1.1" 404 0 "-" "curl/7.50.3" "-"
+127.0.0.1 - - [05/May/2020:11:59:01 +0000] "GET / HTTP/1.1" 404 0 "-" "curl/7.50.3" "-"
 ```
 
 ## solution
@@ -90,4 +90,17 @@ ngx.log(ngx.STDERR, 'Real Source IP: ' ..hostip)
 if not isempty(hostip) then
   ngx.req.set_header("X-Forwarded-For", hostip)
 end
+```
+
+### testing
+NGINX logs:
+```
+==> /var/log/nginx/access.log <==
+127.0.0.1 - - [05/May/2020:12:49:33 +0000] "GET / HTTP/1.1" 404 146 "-" "curl/7.50.3" "172.17.252.215"
+
+==> /var/log/nginx/error.log <==
+2020/05/05 12:49:33 [] 7432#7432: *3 [lua] header_filter.lua:12: Connection params: REMOTE_ADDR=127.0.0.1 REMOTE_PORT=49284, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "192.168.199.16:1994"
+2020/05/05 12:49:33 [] 7432#7432: *3 [lua] header_filter.lua:16: Reading file: /dev/shm/openvpn-port-share/[AF_INET]127.0.0.1:49284, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "192.168.199.16:1994"
+2020/05/05 12:49:33 [] 7432#7432: *3 [lua] header_filter.lua:21: Real user: 172.17.252.215:52940, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "192.168.199.16:1994"
+2020/05/05 12:49:33 [] 7432#7432: *3 [lua] header_filter.lua:25: Real Source IP: 172.17.252.215, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "192.168.199.16:1994"
 ```
