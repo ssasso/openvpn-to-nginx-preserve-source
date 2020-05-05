@@ -1,5 +1,5 @@
 # openvpn-to-nginx-preserve-source
-LUA configuration for NGINX to be used together with OpenVPN port-share
+LUA configuration for NGINX to be used together with OpenVPN port-share, in order to be able to read the real client source IP address.
 
 ## intro
 OpenVPN has a config flag that allows to expose a WebServer (on HTTPS) on the same (TCP) port used for the VPN.
